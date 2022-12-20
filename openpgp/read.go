@@ -178,6 +178,13 @@ FindKey:
 					return nil, err
 				}
 				if decrypted != nil {
+					// If decryption key is one-time, erase it to ensure forward secrecy.
+					if pk.key.SelfSignature.FlagForwardSecrecy {
+						err := pk.key.Entity.DeleteForwardSecret(pk.key.PublicKey)
+						if err != nil {
+							return nil, err
+						}
+					}
 					md.DecryptedWith = pk.key
 					break FindKey
 				}
