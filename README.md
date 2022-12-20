@@ -6,7 +6,7 @@ This module is backwards compatible with x/crypto/openpgp,
 so you can simply replace all imports of `golang.org/x/crypto/openpgp` with
 `github.com/MatthiasMi/go-crypto/openpgp`.
 
-A partial list of changes is here: https://github.com/ProtonMail/go-crypto/issues/21#issuecomment-492792917, and another feature to a privacy-preserving email provider's implementation is described below.
+A partial list of changes is [here](https://github.com/ProtonMail/go-crypto/issues/21#issuecomment-492792917), and another feature to a privacy-preserving email provider's implementation, [perfect forward secercy](./doc_pfs.md), is described below.
 
 ## Background
 The [OpenPGP specification](https://tools.ietf.org/html/rfc4880) specifies formats for encrypted messages, signed messages, etc. and the [Go crypto library](https://github.com/ProtonMail/go-crypto) of my privacy-preserving email provider ProtonMail. This library is a fork of the [Go crypto library](https://github.com/golang/crypto) and a collection of cryptography-related functionality, including an OpenPGP implementation in the "openpgp" subdirectory.
