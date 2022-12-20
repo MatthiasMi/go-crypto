@@ -31,6 +31,10 @@ const (
 	KeyFlagAuthenticate
 	_
 	KeyFlagGroupKey
+	// For KeyFlagForwardSecrecy subpacket type: 27 (keyFlagsSubpacket); Bit 5 (0x20) must be set,
+	// see [draft §3](https://datatracker.ietf.org/doc/html/draft-brown-pgp-pfs-03#section-3),
+	// but as it is taken Bit 6 (0x40) is set.
+	KeyFlagForwardSecrecy = 0x40
 )
 
 // Signature represents a signature. See RFC 4880, section 5.2.
@@ -91,6 +95,9 @@ type Signature struct {
 	// indicating that the issuer implementation supports these features
 	// (section 5.2.5.25).
 	MDC, AEAD, V5Keys bool
+
+	// See [draft §3](https://datatracker.ietf.org/doc/html/draft-brown-pgp-pfs-03#section-3)
+	FlagForwardSecrecy bool
 
 	// EmbeddedSignature, if non-nil, is a signature of the parent key, by
 	// this key. This prevents an attacker from claiming another's signing
@@ -388,6 +395,9 @@ func parseSignatureSubpacket(sig *Signature, subpacket []byte, isHashed bool) (r
 		if subpacket[0]&KeyFlagGroupKey != 0 {
 			sig.FlagGroupKey = true
 		}
+		if subpacket[0]&KeyFlagForwardSecrecy != 0 {
+			sig.FlagForwardSecrecy = true
+		}
 	case signerUserIdSubpacket:
 		userId := string(subpacket)
 		sig.SignerUserId = &userId
@@ -419,6 +429,11 @@ func parseSignatureSubpacket(sig *Signature, subpacket []byte, isHashed bool) (r
 			}
 			if subpacket[0]&0x04 != 0 {
 				sig.V5Keys = true
+			}
+			// According to [draft §3](https://datatracker.ietf.org/doc/html/draft-brown-pgp-pfs-03#section-3), for
+			// Subpacket type: 30 (keyFlagsSubpacket); Bit 1 (0x2) must be set, which is taken by AEAD => Bit 3 (0x08).
+			if subpacket[0]&0x08 != 0 {
+				sig.FlagForwardSecrecy = true
 			}
 		}
 	case embeddedSignatureSubpacket:
@@ -882,6 +897,9 @@ func (sig *Signature) buildSubpackets(issuer PublicKey) (subpackets []outputSubp
 		if sig.FlagGroupKey {
 			flags |= KeyFlagGroupKey
 		}
+		if sig.FlagForwardSecrecy {
+			flags |= KeyFlagForwardSecrecy
+		}
 		subpackets = append(subpackets, outputSubpacket{true, keyFlagsSubpacket, false, []byte{flags}})
 	}
 
@@ -896,6 +914,9 @@ func (sig *Signature) buildSubpackets(issuer PublicKey) (subpackets []outputSubp
 	}
 	if sig.V5Keys {
 		features |= 0x04
+	}
+	if sig.FlagForwardSecrecy {
+		features |= 0x08
 	}
 
 	if features != 0x00 {
@@ -971,7 +992,7 @@ func (sig *Signature) AddMetadataToHashSuffix() {
 	n := sig.HashSuffix[len(sig.HashSuffix)-8:]
 	l := uint64(
 		uint64(n[0])<<56 | uint64(n[1])<<48 | uint64(n[2])<<40 | uint64(n[3])<<32 |
-		uint64(n[4])<<24 | uint64(n[5])<<16 | uint64(n[6])<<8 | uint64(n[7]))
+			uint64(n[4])<<24 | uint64(n[5])<<16 | uint64(n[6])<<8 | uint64(n[7]))
 
 	suffix := bytes.NewBuffer(nil)
 	suffix.Write(sig.HashSuffix[:l])

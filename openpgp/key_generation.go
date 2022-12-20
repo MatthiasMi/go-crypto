@@ -241,6 +241,54 @@ func (e *Entity) addEncryptionSubkey(config *packet.Config, creationTime time.Ti
 	return nil
 }
 
+// AddForwardSecret adds an encryption keypair as a subkey to the Entity.
+// If config is nil, sensible defaults will be used.
+func (e *Entity) AddForwardSecret(config *packet.Config) error {
+	creationTime := config.Now()
+	keyLifetimeSecs := config.KeyLifetimeSecs
+	// If ForwardSecrecy is enabled, ForwardSecrets (=subkeys) are flagged,
+	// and lifetime is changed accordingly.
+	if config.ForwardSecrecyEnabled() {
+		keyLifetimeSecs = config.ForwardSecretLifetime()
+	}
+
+	subPrivRaw, err := newDecrypter(config)
+	if err != nil {
+		return err
+	}
+	sub := packet.NewDecrypterPrivateKey(creationTime, subPrivRaw)
+
+	subkey := Subkey{
+		PublicKey:  &sub.PublicKey,
+		PrivateKey: sub,
+		Sig: &packet.Signature{
+			Version:                   e.PrimaryKey.Version,
+			CreationTime:              creationTime,
+			SigType:                   packet.SigTypeSubkeyBinding,
+			PubKeyAlgo:                e.PrimaryKey.PubKeyAlgo,
+			Hash:                      config.Hash(),
+			KeyLifetimeSecs:           &keyLifetimeSecs,
+			FlagForwardSecrecy:        config.ForwardSecrecyEnabled(),
+			FlagsValid:                true,
+			FlagEncryptStorage:        true,
+			FlagEncryptCommunications: true,
+			IssuerKeyId:               &e.PrimaryKey.KeyId,
+		},
+	}
+	if config != nil && config.V5Keys {
+		subkey.PublicKey.UpgradeToV5()
+	}
+
+	subkey.PublicKey.IsSubkey = true
+	subkey.PrivateKey.IsSubkey = true
+	if err = subkey.Sig.SignKey(subkey.PublicKey, e.PrivateKey, config); err != nil {
+		return err
+	}
+
+	e.Subkeys = append(e.Subkeys, subkey)
+	return nil
+}
+
 // Generates a signing key
 func newSigner(config *packet.Config) (signer interface{}, err error) {
 	switch config.PublicKeyAlgorithm() {

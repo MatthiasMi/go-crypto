@@ -94,6 +94,12 @@ type Config struct {
 	// might be no other way than to tolerate the missing MDC. Setting this flag, allows this
 	// mode of operation. It should be considered a measure of last resort.
 	InsecureAllowUnauthenticatedMessages bool
+	// Add ForwardSecrecy support defaults to `false`, hence ensuring backward-compatibility.
+	ForwardSecrecy bool
+	// ForwardSecrets sent along with messages, if ForwardSecrecy is enabled.
+	ForwardSecrets uint8
+	// Validity of ForwardSecrets expire, e.g., a week or `604800` [s], after creation.
+	ForwardSecretLifetimeSecs uint32
 }
 
 func (c *Config) Random() io.Reader {
@@ -201,4 +207,25 @@ func (c *Config) AllowUnauthenticatedMessages() bool {
 		return false
 	}
 	return c.InsecureAllowUnauthenticatedMessages
+}
+
+func (c *Config) ForwardSecrecyEnabled() bool {
+	if c == nil {
+		c.ForwardSecrecy = false
+	}
+	return c.ForwardSecrecy
+}
+
+func (c *Config) NumForwardSecrets() uint8 {
+	if c == nil {
+		c.ForwardSecrets = 0
+	}
+	return c.ForwardSecrets
+}
+
+func (c *Config) ForwardSecretLifetime() uint32 {
+	if c == nil {
+		c.ForwardSecretLifetimeSecs = 0
+	}
+	return c.ForwardSecretLifetimeSecs
 }
