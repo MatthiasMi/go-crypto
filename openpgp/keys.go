@@ -162,7 +162,6 @@ func (e *Entity) EncryptionKey(now time.Time) (Key, bool) {
 	return Key{}, false
 }
 
-
 // CertificationKey return the best candidate Key for certifying a key with this
 // Entity.
 func (e *Entity) CertificationKey(now time.Time) (Key, bool) {
@@ -203,8 +202,8 @@ func (e *Entity) signingKeyByIdUsage(now time.Time, id uint64, flags int) (Key, 
 	var maxTime time.Time
 	for idx, subkey := range e.Subkeys {
 		if subkey.Sig.FlagsValid &&
-			(flags & packet.KeyFlagCertify == 0 || subkey.Sig.FlagCertify) &&
-			(flags & packet.KeyFlagSign == 0 || subkey.Sig.FlagSign) &&
+			(flags&packet.KeyFlagCertify == 0 || subkey.Sig.FlagCertify) &&
+			(flags&packet.KeyFlagSign == 0 || subkey.Sig.FlagSign) &&
 			subkey.PublicKey.PubKeyAlgo.CanSign() &&
 			!subkey.PublicKey.KeyExpired(subkey.Sig, now) &&
 			!subkey.Sig.SigExpired(now) &&
@@ -224,9 +223,8 @@ func (e *Entity) signingKeyByIdUsage(now time.Time, id uint64, flags int) (Key, 
 	// If we have no candidate subkey then we assume that it's ok to sign
 	// with the primary key.  Or, if the primary key is marked as ok to
 	// sign with, then we can use it.
-	if !i.SelfSignature.FlagsValid || (
-			(flags & packet.KeyFlagCertify == 0 || i.SelfSignature.FlagCertify) &&
-			(flags & packet.KeyFlagSign == 0 || i.SelfSignature.FlagSign)) &&
+	if !i.SelfSignature.FlagsValid || ((flags&packet.KeyFlagCertify == 0 || i.SelfSignature.FlagCertify) &&
+		(flags&packet.KeyFlagSign == 0 || i.SelfSignature.FlagSign)) &&
 		e.PrimaryKey.PubKeyAlgo.CanSign() &&
 		(id == 0 || e.PrimaryKey.KeyId == id) {
 		return Key{e, e.PrimaryKey, e.PrivateKey, i.SelfSignature, e.Revocations}, true
@@ -798,6 +796,23 @@ func (e *Entity) RevokeKey(reason packet.ReasonForRevocation, reasonText string,
 		return err
 	}
 	e.Revocations = append(e.Revocations, revSig)
+	return nil
+}
+
+// DeleteForwardSecret deletes used ForwardSecret
+func (e *Entity) DeleteForwardSecret(pk *packet.PublicKey) error {
+	found := false
+	for i, k := range e.Subkeys {
+		if k.PublicKey.KeyIdString() == pk.KeyIdString() {
+			e.Subkeys[i] = e.Subkeys[len(e.Subkeys)-1]
+			e.Subkeys = e.Subkeys[:len(e.Subkeys)-1]
+			// TODO: Ensure key is deleted from RAM as well
+			found = true
+		}
+	}
+	if !found {
+		return errors.UnsupportedError("Subkey could not be deleted.")
+	}
 	return nil
 }
 
